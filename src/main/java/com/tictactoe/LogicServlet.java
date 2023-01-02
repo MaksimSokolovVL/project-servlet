@@ -14,18 +14,21 @@ import java.util.List;
 @WebServlet(name = "LogicServlet", value = "/logic")
 public class LogicServlet extends HttpServlet {
 
-
     // TODO: Request запроса --- Response ответ
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         // Получаем текущую сессию
         HttpSession currentSession = req.getSession();
 
+
         // Получаем объект игрового поля из сессии
         Field field = extractField(currentSession);
 
+        IsGame isGame = extractIsGame(currentSession);
+
+
         // получаем индекс ячейки, по которой произошел клик
-        int index = getSelectedIndex(req, resp, currentSession, field);
+        int index = getSelectedIndex(req, resp, currentSession, field, isGame);
         if (index < 0) {
             return;
         }
@@ -65,6 +68,7 @@ public class LogicServlet extends HttpServlet {
         } else {   // Если пустой ячейки нет и никто не победил - значит это ничья
             // Добавляем в сессию флаг, который сигнализирует что произошла ничья
             currentSession.setAttribute("draw", true);
+            isGame.setIsGame(false);
 
 
             // Считаем список значков
@@ -100,18 +104,28 @@ public class LogicServlet extends HttpServlet {
         return (Field) fieldAttribute;
     }
 
+
+    private IsGame extractIsGame(HttpSession currentSession) {
+        Object fieldAttribute = currentSession.getAttribute("isGameObj");
+        if (IsGame.class != fieldAttribute.getClass()) {
+            currentSession.invalidate();
+            throw new RuntimeException("Session is broken, try one more time");
+        }
+        return (IsGame) fieldAttribute;
+    }
+
     //при клике по любой ячейке, мы будем на сервере получать индекс этой ячейки
-    private int getSelectedIndex(HttpServletRequest request, HttpServletResponse response, HttpSession session, Field field) throws IOException {
+    private int getSelectedIndex(HttpServletRequest request, HttpServletResponse response, HttpSession session, Field field, IsGame isGame) throws IOException {
         String click = request.getParameter("click");
         boolean isNumeric = click.chars().allMatch(Character::isDigit);
 
         boolean isWin = checkWin(response, session, field);
+        boolean isDraw = checkDraw(response, session, field, isGame);
 
-        if (isWin) {
+        if (isWin || isDraw) {
             return -1;
         }
         return isNumeric ? Integer.parseInt(click) : 0;
-
     }
 
     /**
@@ -123,18 +137,29 @@ public class LogicServlet extends HttpServlet {
         if (Sign.CROSS == winner || Sign.NOUGHT == winner) {
             // Добавляем флаг, который показывает что кто-то победил
             currentSession.setAttribute("winner", winner);
-
-
-            // Считаем список значков
-            List<Sign> data = field.getFieldData();
-
-            // Обновляем этот список в сессии
-            currentSession.setAttribute("data", data);
-
-            // Шлем редирект
-            response.sendRedirect("/index.jsp");
+            workingWithListsSession(response, currentSession, field);
             return true;
         }
         return false;
+    }
+
+    private boolean checkDraw(HttpServletResponse response, HttpSession currentSession, Field field, IsGame isGame) throws IOException {
+
+        if (!isGame.getIsGame()) {
+            workingWithListsSession(response, currentSession, field);
+            return true;
+        }
+        return false;
+    }
+
+    private void workingWithListsSession(HttpServletResponse response, HttpSession currentSession, Field field) throws IOException {
+        // Считаем список значков
+        List<Sign> data = field.getFieldData();
+
+        // Обновляем этот список в сессии
+        currentSession.setAttribute("data", data);
+
+        // Шлем редирект
+        response.sendRedirect("/index.jsp");
     }
 }

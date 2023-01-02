@@ -29,6 +29,9 @@ public class InitServlet extends HttpServlet {
         // и значений поля, отсортированных по индексу (нужно для отрисовки крестиков и ноликов)
         currentSession.setAttribute("data", data);
 
+        IsGame isGameObj = new IsGame();
+        currentSession.setAttribute("isGameObj", isGameObj);
+
         // Перенаправление запроса на страницу index.jsp через сервер
         getServletContext().getRequestDispatcher("/index.jsp").forward(req, resp);
     }
